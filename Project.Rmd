@@ -1,0 +1,1435 @@
+---
+title: "Airbnb Project"
+author: "Teresa Graffi"
+date: "`r Sys.Date()`"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+![](airbnb1.png){width="50%"}
+
+# Big Data Processing with R
+# Project on Airbnb data about Paris
+```{r, include=FALSE}
+#setwd('C:/Users/teres/OneDrive/Documents/DSTI/RBigDataProcessing/Project')
+#write.csv(L,file='AirbnbL.csv') # save L dataframe as csv
+#write.csv(R,file='AirbnbR.csv') # save R dataframe as csv
+
+# cleaning the workspace
+rm(list = ls())
+
+# set working directory
+setwd('C:/Users/teres/OneDrive/Documents/DSTI/RBigDataProcessing/Project')
+```
+
+```{r, include=FALSE}
+# load requied libraries and store function created for the analysis
+library(tidyverse)
+library(cowplot) 
+library(visdat)
+library(dplyr)
+library(leaflet)
+library(rmapshaper)
+library(jsonlite)
+library(zoo)
+
+getmode <- function(v) {
+   uniqv <- unique(v)
+   uniqv[which.max(tabulate(match(v, uniqv)))]
+}
+```
+
+The project aims at analyzing Airbnb data regarding the city of Paris, the data was provided into two separate dataframes "L" and "R". The dataframes have been saved as two separate csv files as "AirbnbL" and "AirbnbR" and reloaded from the file with read.csv(). 
+AirbnbL dataset has 95 variables and 52725 observations, while AirbnbR dataset has 2 variables and 663599 observations. 
+
+```{r, include = FALSE}
+# Load the data from the file
+AirbnbL =  read.csv("AirbnbL.csv",header=TRUE)
+AirbnbL = AirbnbL[,-1] # To remove the duplicated index of the individuals
+
+# Load the data from the file
+AirbnbR =  read.csv("AirbnbR.csv",header=TRUE)
+AirbnbR = AirbnbR[,-1] # To remove the duplicated index of the individuals
+```
+
+```{r, echo=FALSE}
+dim(AirbnbL)
+dim(AirbnbR)
+```
+We can also inspect the presence of missing values in the two dataframes using the is.na() function. From the output, it is possible to see that AirbnbL has many missing values (279634), while AirbnbR doesn't present missingness.
+To better understand the data provided the two datasets will be analysed separately.
+
+```{r, echo=FALSE}
+na_sumL <- sum(is.na(AirbnbL))
+cat("Total number of missing values in AirbnbL:", na_sumL, "\n")
+```
+
+```{r, echo=FALSE}
+na_sumR <- sum(is.na(AirbnbR))
+cat("Total number of missing values in AirbnbR:", na_sumR, "\n")
+```
+
+### Analyzing AirbnbL
+
+The preliminary analysis starts with the printing of the first line of the data to understand how data look like, and an inspection on the datatypes of the variables. 
+Since there are 95 variables in order to have a clear view of the datatypes instead of using str() we can use lapply() with the function class(), and we can group the variables according to their datatype.
+```{r, echo=FALSE}
+# Printing first line of the dataset
+head(AirbnbL,1)
+```
+From the name of the columns and from the data of the two first rows we can understand what each column describe. The variables can be divided into 9 macro categories as follows:
+
+-- Identification related columns:
+
+- id: Unique identifier for each Airbnb listing / accommodation.
+
+- listing_url: URL link to the listing on the Airbnb website. 
+
+- scrape_id: Unique identifier for the scraping process. 
+
+- last_scraped: Date when the listing was last scraped. 
+
+-- Description related columns:
+
+- name: Name/title of the listing. 
+
+- summary: Brief summary description of the accommodation. 
+
+- space: Description of the space within the listing. 
+
+- description: Detailed description of the accommodation. 
+
+- experiences_offered: Information about the experiences offered by the host. 
+
+- neighborhood_overview: Overview of the neighborhood where the accommodation is located. 
+
+- notes: Additional notes provided by the host. 
+
+- transit: Information about transportation options.
+
+- access: Information about how to access the accommodation.
+
+- interaction: Details about the interaction between the host and guests.
+
+- house_rules: Rules set by the host for guests staying.
+
+- thumbnail_url: URL link to a thumbnail image of the listing.
+
+- medium_url: URL link to a medium-sized image of the listing.
+
+- picture_url: URL link to the main picture of the listing.
+
+- xl_picture_url: URL link to an extra-large picture of the listing.
+
+-- Host related columns:
+
+- host_id: Unique identifier for the host.
+
+- host_url: URL link to the host's profile on Airbnb.
+
+- host_name: Name of the host.
+
+- host_since: Date when the host joined Airbnb.
+
+- host_location: Location of the host.
+
+- host_about: Information about the host provided by themselves.
+
+- host_response_time: Time taken by the host to respond to requests.
+
+- host_response_rate: Percentage of requests to which the host has responded.
+
+- host_acceptance_rate: Percentage of booking requests accepted by the host.
+
+- host_is_superhost: Indicator variable (T/F) if the host is a superhost.
+
+- host_thumbnail_url: URL link to the host's thumbnail profile picture.
+
+- host_picture_url: URL link to the host's profile picture.
+
+- host_neighbourhood: Neighborhood where the host lives.
+
+- host_listings_count: Total number of accommodations owned by the host.
+
+- host_total_listings_count: Same as host_listings_count.
+
+- host_verifications: Methods used by the host to verify their identity.
+
+- host_has_profile_pic: Indicator variable (T/F) if the host has a profile picture.
+
+- host_identity_verified: Indicator variable (T/F) if the host's identity is verified.
+
+- calculated_host_listings_count: Number of listings by the host.
+
+-- Location related columns:
+
+- street: Address of the accommodation.
+
+- neighbourhood: Neighbourhood name of the accommodation.
+
+- neighbourhood_cleansed: Cleaned column neighbourhood name.
+
+- neighbourhood_group_cleansed: Cleaned column neighbourhood group name.
+
+- city: City of the listing.
+
+- state: State where the listing is located.
+
+- zipcode: Postal code of the listing.
+
+- market: Market where the accommodation is located.
+
+- smart_location: Smart location name.
+
+- country_code: Country code of the accommodation.
+
+- country: Country where the listing is located.
+
+- latitude: Latitude coordinate of the accommodation.
+
+- longitude: Longitude coordinate of the accommodation.
+
+- is_location_exact: Indicator variable (T/F) if the location is exact.
+
+-- Accommodation details columns:
+
+- property_type: Type of property (e.g., apartment, house, etc.).
+
+- room_type: Type of room available (e.g., entire home, private room, etc.).
+
+- accommodates: Maximum number of guests the accommodation can accommodate.
+
+- bathrooms: Number of bathrooms.
+
+- bedrooms: Number of bedrooms.
+
+- beds: Number of beds.
+
+- bed_type: Type of bed (e.g., real bed, sofa bed, etc.).
+
+- amenities: List of amenities provided in the listing.
+
+- square_feet: Area of the listing in square feet.
+
+-- Price related columns:
+
+- price: Price per night for the accommodation.
+
+- weekly_price: Weekly price for the accommodation.
+
+- monthly_price: Monthly price for the accommodation.
+
+- security_deposit: Amount of security deposit required.
+
+- cleaning_fee: Fee charged for cleaning the accommodation.
+
+- guests_included: Number of guests included in the base price.
+
+- extra_people: Fee charged for additional guests.
+
+-- Calendar and Time related columns:
+
+- minimum_nights: Minimum number of nights required for booking.
+
+- maximum_nights: Maximum number of nights allowed for booking.
+
+- calendar_updated: Information about when the calendar was last updated.
+
+- has_availability: Indicator variable (T/F) if the listing has availability.
+
+- availability_30: Number of available days within the next 30 days.
+
+- availability_60: Number of available days within the next 60 days.
+
+- availability_90: Number of available days within the next 90 days.
+
+- availability_365: Number of available days within the next 365 days.
+
+- calendar_last_scraped: Date when the calendar was last scraped.
+
+-- Reviews related columns:
+
+- number_of_reviews: Total number of reviews for the accommodation.
+
+- first_review: Date of the first review (less recent).
+
+- last_review: Date of the most recent review.
+
+- review_scores_rating: Rating score based on guest reviews.
+
+- review_scores_accuracy: Rating score for accuracy based on guest reviews.
+
+- review_scores_cleanliness: Rating score for cleanliness based on guest reviews.
+
+- review_scores_checkin: Rating score for check-in process based on guest reviews.
+
+- review_scores_communication: Rating score for communication based on guest reviews.
+
+- review_scores_location: Rating score for location based on guest reviews.
+
+- review_scores_value: Rating score for value based on guest reviews.
+
+- reviews_per_month: Average number of reviews received per month.
+
+-- Policies related columns:
+
+- requires_license: Indicator variable (T/F) if a license is required.
+
+- license: License information.
+
+- jurisdiction_names: Names of jurisdictions.
+
+- instant_bookable: Indicator variable (T/F) if instant booking is available.
+
+- cancellation_policy: Policy for canceling bookings.
+
+- require_guest_profile_picture: Indicator variable (T/F) if guest profile picture is required.
+
+- require_guest_phone_verification: Indicator variable (T/F) if guest phone verification is required.
+
+
+```{r, include = FALSE}
+# Name of the variable and its datatype
+lapply(AirbnbL,class)
+```
+
+
+For what concerns datatypes, most of the variables are of type character, some of type integer, and just a few of type numeric. 
+It seems that not all the columns already have the right datatype, for example, price related variables are considered as character while they should be numerical. Moreover there are no variables in date format while there should be, for example, "last_scraped", and "calendar_last_scraped"..
+The first miss classification could be due to the presence of symbols in the price, for example $/£/€. Whereas for the dates probably the format couldn't be identified and it should be assigned manually.
+
+```{r, echo=FALSE}
+# Showing variables according to their datatype
+split(names(AirbnbL),sapply(AirbnbL, function(x) paste(class(x), collapse=" ")))
+```
+#### Assigning the right datatypes
+
+Character variables that should be of type date: last_scraped, host_since, calendar_last_scraped, first_review, last_review.
+Character variables that should be of type numerical (assigned to character because of the % symbol): host_response_rate, host_acceptance_rate.
+Character variables that should be of type numerical (assigned to character because of the $ symbol): price, weekly_price, monthly_price, security_deposit, cleaning_fee, extra_people. 
+
+
+- Converting dates into date format:
+
+-- last_scraped
+```{r, echo=FALSE}
+
+# Convert the "last_scraped" column to Date format
+cat("Initial datatype of last_scraped:", class(AirbnbL$last_scraped), "\n")
+cat("Number of NAs:", sum(is.na(AirbnbL$last_scraped)) ,"\n")
+head(AirbnbL$last_scraped,1) # to understand the format of the date
+AirbnbL$last_scraped <- as.Date(AirbnbL$last_scraped, format = "%Y-%m-%d")
+cat("Datatype of last_scraped:", class(AirbnbL$last_scraped), "\n")
+cat("Number of NAs:", sum(is.na(AirbnbL$last_scraped)) ,"\n")
+```
+
+-- host_since
+```{r, echo=FALSE}
+# Convert the "host_since" column to Date format
+cat("Initial datatype of host_since:", class(AirbnbL$host_since), "\n")
+cat("Number of NAs:", sum(is.na(AirbnbL$host_since)) ,"\n")
+head(AirbnbL$host_since,1) # to understand the format of the date
+AirbnbL$host_since <- as.Date(AirbnbL$host_since, format = "%Y-%m-%d")
+cat("Datatype of host_since:", class(AirbnbL$host_since), "\n")
+cat("Number of NAs:", sum(is.na(AirbnbL$host_since)) ,"\n") #46 NAs 
+median_date <- median(as.Date(AirbnbL$host_since, format = "%Y-%m-%d"), na.rm = TRUE)
+AirbnbL$host_since[is.na(AirbnbL$host_since)] <- median_date
+cat("Number of NAs:", sum(is.na(AirbnbL$host_since)) ,"\n")
+```
+
+-- calendar_last_scraped
+```{r, echo=FALSE}
+# Convert the "calendar_last_scraped" column to Date format
+cat("Initial datatype of calendar_last_scraped:", class(AirbnbL$calendar_last_scraped), "\n")
+cat("Number of NAs:", sum(is.na(AirbnbL$calendar_last_scraped)) ,"\n")
+head(AirbnbL$calendar_last_scraped,1) # to understand the format of the date
+AirbnbL$calendar_last_scraped <- as.Date(AirbnbL$calendar_last_scraped, format = "%Y-%m-%d")
+cat("Datatype of calendar_last_scraped:", class(AirbnbL$calendar_last_scraped), "\n")
+cat("Number of NAs:", sum(is.na(AirbnbL$calendar_last_scraped)) ,"\n") #0 NAs 
+```
+
+-- first_review
+```{r, echo=FALSE}
+# Convert the "first_review" column to Date format
+cat("Initial datatype of first_review:", class(AirbnbL$first_review), "\n")
+cat("Number of NAs:", sum(is.na(AirbnbL$first_review)) ,"\n")
+head(AirbnbL$first_review,1) # to understand the format of the date
+AirbnbL$first_review <- as.Date(AirbnbL$first_review, format = "%Y-%m-%d")
+cat("Datatype of first_review:", class(AirbnbL$first_review), "\n")
+cat("Number of NAs:", sum(is.na(AirbnbL$first_review)) ,"\n") #14508 NAs 
+median_date <- median(as.Date(AirbnbL$first_review, format = "%Y-%m-%d"), na.rm = TRUE)
+AirbnbL$first_review[is.na(AirbnbL$first_review)] <- (median_date)
+cat("Number of NAs:", sum(is.na(AirbnbL$first_review)) ,"\n")
+```
+
+-- last_review
+```{r, echo=FALSE}
+# Convert the "last_review" column to Date format
+cat("Initial datatype of last_review:", class(AirbnbL$last_review), "\n")
+cat("Number of NAs:", sum(is.na(AirbnbL$last_review)) ,"\n")
+head(AirbnbL$last_review,1) # to understand the format of the date
+AirbnbL$last_review <- as.Date(AirbnbL$last_review, format = "%Y-%m-%d")
+cat("Datatype of last_review:", class(AirbnbL$last_review), "\n")
+cat("Number of NAs:", sum(is.na(AirbnbL$last_review)) ,"\n") #14509 NAs 
+median_date <- median(as.Date(AirbnbL$last_review, format = "%Y-%m-%d"), na.rm = TRUE)
+AirbnbL$last_review[is.na(AirbnbL$last_review)] <- median_date
+cat("Number of NAs:", sum(is.na(AirbnbL$last_review)) ,"\n")
+```
+
+
+- Converting character values into numeric format removing the % symbol:
+
+After converting them we can compute the mean to see what's the average response rate (>92%) and acceptance rate (>85%).
+
+-- host_response_rate
+
+"host_response_rate" has some values that are not numerical, these are represented with N/A, which could mean that there is no information on the real value. We can still transform the column into numerical but keeping also the categorical version. During the numerical transformation some NA will appear because of the N/A but these values will be input with the average of the column. 
+```{r, echo=FALSE}
+
+# host_response_rate
+head(AirbnbL$host_response_rate,1) 
+tail(AirbnbL$host_response_rate,1)
+
+cat("Initial datatype of host_response_rate:", class(AirbnbL$host_response_rate), "\n")
+
+cat("Number of NAs:", sum(is.na(AirbnbL$host_response_rate)) ,"\n")
+
+reg1 <- gsub("\\%", "", AirbnbL$host_response_rate)
+AirbnbL$host_response_rate_num <- as.numeric(reg1) #NAs introduced by coercion
+
+cat("Datatype of host_response_rate_num:", class(AirbnbL$host_response_rate_num), "\n")
+cat("Number of NAs:", sum(is.na(AirbnbL$host_response_rate_num)) ,"\n") #12563 NAs
+
+# Compute average of host_response_rate_num
+host_response_rate_num <- mean(AirbnbL$host_response_rate_num, na.rm = TRUE)
+cat("Average host_response_rate_num:", host_response_rate_num, "\n")
+
+AirbnbL$host_response_rate_num[is.na(AirbnbL$host_response_rate_num)] <- host_response_rate_num
+cat("Number of NAs:", sum(is.na(AirbnbL$host_response_rate_num)) ,"\n")
+
+
+```
+
+-- host_acceptance_rate
+
+Like "host_response_rate", also "host_acceptance_rate" has some values that are not numerical, represented with N/A. We're going to input the NAs introduced by coercion with the average of the column. 
+```{r, echo=FALSE}
+# host_acceptance_rate
+head(AirbnbL$host_acceptance_rate,1) 
+tail(AirbnbL$host_acceptance_rate,1)
+
+cat("Initial datatype of host_acceptance_rate:", class(AirbnbL$host_acceptance_rate), "\n")
+
+cat("Number of NAs:", sum(is.na(AirbnbL$host_acceptance_rate)) ,"\n")
+
+reg1 <- gsub("\\%", "", AirbnbL$host_acceptance_rate)
+AirbnbL$host_acceptance_rate_num <- as.numeric(reg1) #NAs introduced by coercion
+
+cat("Datatype of host_acceptance_rate_num:", class(AirbnbL$host_acceptance_rate_num), "\n")
+cat("Number of NAs:", sum(is.na(AirbnbL$host_acceptance_rate_num)) ,"\n") #15637 NAs
+
+# Compute average of host_acceptance_rate
+host_acceptance_rate_num <- mean(AirbnbL$host_acceptance_rate_num, na.rm = TRUE)
+cat("Average host_acceptance_rate_num:", host_acceptance_rate_num, "\n")
+
+AirbnbL$host_acceptance_rate_num[is.na(AirbnbL$host_acceptance_rate_num)] <- host_acceptance_rate_num
+cat("Number of NAs:", sum(is.na(AirbnbL$host_acceptance_rate_num)) ,"\n")
+
+```
+
+- Converting character values into numeric format removing the $ symbol:
+
+Character variables that should be of type numerical (assigned to character because of the $ symbol): price, weekly_price, monthly_price, security_deposit, cleaning_fee, extra_people.
+To transform them into integer format, the "$" symbol and "," (used to represent thousands) were removed using the gsub() function with regular expression, and converted into numeric.
+
+-- Price column
+
+```{r, , echo=FALSE}
+# Analyze Price column
+head(AirbnbL$price,1) 
+
+cat("Initial datatype:", class(AirbnbL$price), "\n")
+cat("Number of NAs:", sum(is.na(AirbnbL$price)) ,"\n")
+
+reg1 <- gsub("\\$", "", AirbnbL$price)
+reg2 <- gsub("\\,", "", reg1)
+AirbnbL$price_num <- as.numeric(reg2)
+
+cat("Datatype:", class(AirbnbL$price_num), "\n")
+cat("Number of NAs:", sum(is.na(AirbnbL$price_num)) ,"\n")
+```
+
+
+
+-- Weekly_price column
+
+From the print of the first 5 values of the column it is possible to see that there are many empty values. What we can do to deal with the empty values is to input them with the corresponding price per night multiplied by 7. 
+Indeed, sometimes Airbnb's hosts offer a discount when the guests book the accommodation for more than 7 nights, i.e., they stay for at least a whole week. It could be that the weekly price was reported just for accommodations who offer a discount, hence we could fill the empty values with the "standard" price.
+
+```{r, echo=FALSE}
+# Analyze weekly_price column
+
+head(AirbnbL$weekly_price,5) 
+
+empty_indices <- which(AirbnbL$weekly_price == "")  # Get indices of empty values
+AirbnbL$weekly_price[empty_indices] <- (AirbnbL$price_num[empty_indices])* 7  # Fill empty values with corresponding price * 7
+
+cat("Initial datatype:", class(AirbnbL$weekly_price), "\n")
+cat("Number of NAs:", sum(is.na(AirbnbL$weekly_price)) ,"\n")
+
+reg1 <- gsub("\\$", "", AirbnbL$weekly_price)
+reg2 <- gsub("\\,", "", reg1)
+AirbnbL$weekly_price_num <- as.numeric(reg2)
+
+cat("Datatype:", class(AirbnbL$weekly_price_num), "\n")
+cat("Number of NAs:", sum(is.na(AirbnbL$weekly_price_num)) ,"\n") #0 NAs
+```
+
+
+
+-- Monthly_price column
+
+Similarly to weekly_price, in monthly_price there are many empty values. In this case we will input them with the corresponding price per night multiplied by 30. 
+```{r, echo=FALSE}
+# Analyze monthly_price column
+
+head(AirbnbL$monthly_price,5) 
+
+empty_indices <- which(AirbnbL$monthly_price == "")  # Get indices of empty values
+AirbnbL$monthly_price[empty_indices] <- (AirbnbL$price_num[empty_indices])* 30  # Fill empty values with corresponding price * 30
+
+cat("Initial datatype:", class(AirbnbL$monthly_price), "\n")
+cat("Number of NAs:", sum(is.na(AirbnbL$monthly_price)) ,"\n")
+
+reg1 <- gsub("\\$", "", AirbnbL$monthly_price)
+reg2 <- gsub("\\,", "", reg1)
+AirbnbL$monthly_price_num <- as.numeric(reg2)
+
+cat("Datatype:", class(AirbnbL$monthly_price_num), "\n")
+cat("Number of NAs:", sum(is.na(AirbnbL$monthly_price_num)) ,"\n") #0 NAs
+```
+
+
+-- Security_deposit column
+
+Also in the security_deposit column there are empty values. Following the same logic of the previous inputed values, we could fill the empty values in security deposit with the corresponding value of price multiplied by 1.5. This is because the security deposit cost should be proportional to the cost of the accommodation and usually a little bit higher than it.  
+
+```{r, echo=FALSE}
+# Analyze security_deposit column
+
+head(AirbnbL$security_deposit,5) 
+
+empty_indices <- which(AirbnbL$security_deposit == "")  # Get indices of empty values
+AirbnbL$security_deposit[empty_indices] <- (AirbnbL$price_num[empty_indices])* 1.5  # Fill empty values with corresponding price * 1.5
+
+cat("Initial datatype:", class(AirbnbL$security_deposit), "\n")
+cat("Number of NAs:", sum(is.na(AirbnbL$security_deposit)) ,"\n")
+
+reg1 <- gsub("\\$", "", AirbnbL$security_deposit)
+reg2 <- gsub("\\,", "", reg1)
+AirbnbL$security_deposit_num <- as.numeric(reg2)
+
+cat("Datatype:", class(AirbnbL$security_deposit_num), "\n")
+cat("Number of NAs:", sum(is.na(AirbnbL$security_deposit_num)) ,"\n") #0 NAs
+
+```
+
+
+-- Cleaning_fee column
+
+There are many empty values in cleaning_fee as well, in this case we could fill them with 1/4 of the price per night.
+
+```{r, echo=FALSE}
+# Analyze cleaning_fee column
+
+head(AirbnbL$cleaning_fee,5) 
+
+empty_indices <- which(AirbnbL$cleaning_fee == "")  # Get indices of empty values
+AirbnbL$cleaning_fee[empty_indices] <- (AirbnbL$price_num[empty_indices])* 0.25  # Fill empty values with corresponding price * 0.25
+
+cat("Initial datatype:", class(AirbnbL$cleaning_fee), "\n")
+cat("Number of NAs:", sum(is.na(AirbnbL$cleaning_fee)) ,"\n")
+
+reg1 <- gsub("\\$", "", AirbnbL$cleaning_fee)
+reg2 <- gsub("\\,", "", reg1)
+AirbnbL$cleaning_fee_num <- as.numeric(reg2)
+
+cat("Datatype:", class(AirbnbL$cleaning_fee_num), "\n")
+cat("Number of NAs:", sum(is.na(AirbnbL$cleaning_fee_num)) ,"\n") #0 NAs
+
+```
+
+-- Extra_people column
+
+Extra_people column does not present any missing values or empty values, hence the variable will be just transformed into numeric format.
+
+```{r, echo=FALSE}
+# Analyze extra_people column
+
+head(AirbnbL$extra_people,5) 
+
+cat("Initial datatype:", class(AirbnbL$extra_people), "\n")
+cat("Number of NAs:", sum(is.na(AirbnbL$extra_people)) ,"\n")
+
+reg1 <- gsub("\\$", "", AirbnbL$extra_people)
+reg2 <- gsub("\\,", "", reg1)
+AirbnbL$extra_people_num <- as.numeric(reg2)
+
+cat("Datatype:", class(AirbnbL$extra_people_num), "\n")
+cat("Number of NAs:", sum(is.na(AirbnbL$extra_people_num)) ,"\n")
+```
+
+
+
+
+#### Missingness and duplicates
+
+-- Missingness 
+
+Follows an inspection on missingness using the is.na() function. In the whole dataframe there are 279634 NAs, using the colSums() function it can be seen that only 24 columns out of 95 present missing values. 
+In some columns the number of NA is very low (<10), these are: space, neighborhood_overview, notes, transit, access, interaction, house_rules, host_about. 
+In other columns the number of NA is medium/low (between 50 and 250), this is the case for: host_listings_count, host_total_listings_count, bathrooms, bedrooms, beds. 
+While in others the number of NA is very high (>10000) and dropping the entire variable may be considered, this is the case for: neighbourhood_group_cleansed, square_feet, has_availability, review_scores_rating, review_scores_accuracy, review_scores_cleanliness, review_scores_checkin, review_scores_communication, review_scores_location, review_scores_value, reviews_per_month.
+
+```{r, echo=FALSE}
+na_sum <- sum(is.na(AirbnbL))
+cat("Total number of missing values in the dataframe:", na_sum, "\n")
+columns_with_missing <- colnames(AirbnbL)[colSums(is.na(AirbnbL)) > 0]
+cat("Total number of columns with missing values in the dataframe:", length(columns_with_missing), "\n")
+```
+
+```{r, echo=FALSE}
+colSums(is.na(AirbnbL[, columns_with_missing]))
+
+```
+To have a clearer view of the missing values we can arrange them from the variable with highest number of NAs to the one with lowest number of NAs. 
+It is possible to notice that the columns neighbourhood_group_cleansed and has_availability have 52725 missing values, which means that all the rows are missing for this two columns. Also square_feet column presents more missing rows than non missing rows (50218 vs 2507). In order to have a dataframe as clean as possible the columns with more NAs than non missing values will be dropped (neighbourhood_group_cleansed, has_availability, square_feet).
+```{r, echo=FALSE}
+# Check for missing values
+missing_counts <- AirbnbL[, columns_with_missing] %>%
+  summarize_all(~ sum(is.na(.))) %>%
+  gather(variable, missing_count)
+
+# Sort the missing counts in descending order
+missing_counts <- missing_counts %>%
+  arrange(desc(missing_count))
+
+# Display the missing value counts
+cat("Number of missing values in the dataframe in decreasing order:", "\n")
+missing_counts
+
+# Dropping columns with a too high number of NAs
+AirbnbL = subset(AirbnbL, select = -c(neighbourhood_group_cleansed, has_availability, square_feet) )
+
+# Printing current number of variables in the dataframe
+n_col <- ncol(AirbnbL)
+cat("Updated number of columns in the dataframe:", n_col, "\n")
+
+```
+
+The following graph provides an at-a-glance plot of the missingness inside the dataframe, colouring cells, according to missingness, where green indicates a missing cell and violet indicates a present cell.  Using the vis_miss() function it is possible to show how the missing values are distributed. 
+In order to have a clear view, we can visualize just variables with at least 1 missing value and order the columns according to the presence of missing value from highest to lowest, showing next to the name of the column the percentage of missing values for that column. 
+From the plot it is noticeable that the missing values seem to be always in the same rows. Which means that we could drop the rows with many missing values without loosing too many observations. 
+
+```{r, echo=FALSE}
+# Identify columns with at least one NA
+columns_with_missing <- colnames(AirbnbL)[colSums(is.na(AirbnbL)) > 0]
+
+# Subset the dataframe with columns containing NA
+subset_df <- AirbnbL[, columns_with_missing]
+
+cat("Missingness distribution in columns with at least 1 NA, decreasing order:",  "\n")
+# Visualize the NA distribution
+vis_miss(subset_df, show_perc = FALSE, sort_miss = TRUE, warn_large_data = FALSE) +
+  theme(plot.background = element_rect(fill = "white"), 
+        panel.background = element_rect(fill = "lavender"),
+        axis.text.x = element_text(angle = 90, hjust = 0),
+        legend.title = element_blank()) +
+  scale_fill_manual(values = c("lavender","cadetblue"),
+                    labels = c("Non Missing", "Missing"),
+                    name = "Values") +
+  labs(x = "Variables with NAs")
+
+
+```
+
+In order to work on a clean dataframe, we can get rid of those rows that present many missing value. This can be done filtering the data frame and keeping only the rows with one or fewer missing values. 
+If we remove rows with more than 1 NA, 15653 rows will be dropped, if we set the condition to more than 2 NAs, 15580 rows will be removed, this means that there are just a few rows with few value missing (73). Similarly, if we set the limit to 3 rows, the number of rows to be removed will be 15541, which is very similar to the number of rows to be removed with the limit set to more than 2 NAs. For this reason, we can set the limit to rows with more than 1 NA and remove them from the dataframe with an anti join.
+After dropping the rows with more than 1 NA the total number of missing values in the dataframe is 345. We can now see in which columns there are still missing values to understand how we can deal with them.
+
+```{r, echo=FALSE}
+starting_na <- sum(is.na(AirbnbL))
+cat("Starting missingness:", starting_na,  "\n")
+```
+
+```{r, echo=FALSE}
+colSums(is.na(AirbnbL[, columns_with_missing]))
+```
+
+
+```{r, echo=FALSE, include=FALSE}
+rows_with_missing <- AirbnbL[rowSums(is.na(AirbnbL)) > 1,]
+# Remove rows with more than one missing value
+AirbnbL <- anti_join(AirbnbL, rows_with_missing)
+```
+
+
+```{r, echo=FALSE}
+ending_na <- sum(is.na(AirbnbL))
+cat("Ending missingness:", ending_na,  "\n")
+```
+There are 12 columns that still present missing values. Depending on whether the variables are numeric or categorical we decide how to input the missing value. For example, notes and host_about are categorical and require a small text, in order not to provide false information we can input the value "Not specified". For numeric and integers value we can compute the average value and input that.
+
+```{r, echo=FALSE}
+columns_with_missing <- colnames(AirbnbL)[colSums(is.na(AirbnbL)) > 0]
+cat("Number of columns that present missingness:", length(columns_with_missing) ,"\n",
+    "Columns that present missingness:", columns_with_missing,  "\n")
+```
+
+```{r, echo=FALSE}
+notes_sum <- sum(is.na(AirbnbL$notes))
+cat("Number of NAs in notes:", notes_sum ,"\n")
+
+host_about_sum <- sum(is.na(AirbnbL$host_about))
+cat("Number of NAs in host_about:", host_about_sum ,"\n")
+
+bathrooms_sum <- sum(is.na(AirbnbL$bathrooms))
+cat("Number of NAs in bathrooms:", bathrooms_sum ,"\n")
+
+bedrooms_sum <- sum(is.na(AirbnbL$bedrooms))
+cat("Number of NAs in bedrooms:", bedrooms_sum ,"\n")
+
+beds_sum <- sum(is.na(AirbnbL$beds))
+cat("Number of NAs in beds:", beds_sum ,"\n")
+
+review_scores_rating_sum <- sum(is.na(AirbnbL$review_scores_rating))
+cat("Number of NAs in review_scores_rating:", review_scores_rating_sum ,"\n")
+
+review_scores_accuracy_sum <- sum(is.na(AirbnbL$review_scores_accuracy))
+cat("Number of NAs in review_scores_accuracy:", review_scores_accuracy_sum ,"\n")
+
+review_scores_cleanliness_sum <- sum(is.na(AirbnbL$review_scores_cleanliness))
+cat("Number of NAs in review_scores_cleanliness:", review_scores_cleanliness_sum ,"\n")
+
+review_scores_checkin_sum <- sum(is.na(AirbnbL$review_scores_checkin))
+cat("Number of NAs in review_scores_checkin:", review_scores_checkin_sum ,"\n")
+
+review_scores_communication_sum <- sum(is.na(AirbnbL$review_scores_communication))
+cat("Number of NAs in review_scores_communication:", review_scores_communication_sum ,"\n")
+
+review_scores_location_sum <- sum(is.na(AirbnbL$review_scores_location))
+cat("Number of NAs in review_scores_location:", review_scores_location_sum ,"\n")
+
+review_scores_value_sum <- sum(is.na(AirbnbL$review_scores_value))
+cat("Number of NAs in review_scores_value:", review_scores_value_sum ,"\n")
+```
+
+```{r, echo=FALSE}
+# Columns
+
+cat("The datatype of notes is:", class(AirbnbL$notes), "\n")
+cat("The datatype of host_about is:", class(AirbnbL$host_about), "\n")
+cat("The datatype of bathrooms is:", class(AirbnbL$bathrooms), "\n")
+cat("The datatype of bedrooms is:", class(AirbnbL$bedrooms), "\n")
+cat("The datatype of beds is:", class(AirbnbL$beds), "\n")
+cat("The datatype of review_scores_rating is:", class(AirbnbL$review_scores_rating), "\n")
+cat("The datatype of review_scores_accuracy is:", class(AirbnbL$review_scores_accuracy), "\n")
+cat("The datatype of review_scores_cleanliness is:", class(AirbnbL$review_scores_cleanliness), "\n")
+cat("The datatype of review_scores_checkin is:", class(AirbnbL$review_scores_checkin), "\n")
+cat("The datatype of review_scores_communication is:", class(AirbnbL$review_scores_communication), "\n")
+cat("The datatype of review_scores_location is:", class(AirbnbL$review_scores_location), "\n")
+cat("The datatype of review_scores_value is:", class(AirbnbL$review_scores_value), "\n")
+```
+
+```{r, echo=FALSE}
+# Using replace to input the value "Not specified" to rows with missing notes or host_about
+AirbnbL$notes <- replace(AirbnbL$notes, is.na(AirbnbL$notes), "Not specified")
+AirbnbL$host_about <- replace(AirbnbL$host_about, is.na(AirbnbL$host_about), "Not specified")
+
+# Using replace to input the average value to missing values of numerical or integer columns
+AirbnbL$bathrooms <- replace(AirbnbL$bathrooms, is.na(AirbnbL$bathrooms), round(mean(AirbnbL$bathrooms, na.rm = T)))
+
+AirbnbL$bedrooms <- replace(AirbnbL$bedrooms, is.na(AirbnbL$bedrooms), round(mean(AirbnbL$bedrooms, na.rm = T)))
+
+AirbnbL$beds <- replace(AirbnbL$beds, is.na(AirbnbL$beds), round(mean(AirbnbL$beds, na.rm = T)))
+
+AirbnbL$review_scores_rating <- replace(AirbnbL$review_scores_rating, is.na(AirbnbL$review_scores_rating), round(mean(AirbnbL$review_scores_rating, na.rm = T)))
+
+AirbnbL$review_scores_accuracy <- replace(AirbnbL$review_scores_accuracy, is.na(AirbnbL$review_scores_accuracy), round(mean(AirbnbL$review_scores_accuracy, na.rm = T)))
+
+AirbnbL$review_scores_cleanliness <- replace(AirbnbL$review_scores_cleanliness, is.na(AirbnbL$review_scores_cleanliness), round(mean(AirbnbL$review_scores_cleanliness, na.rm = T)))
+
+AirbnbL$review_scores_checkin <- replace(AirbnbL$review_scores_checkin, is.na(AirbnbL$review_scores_checkin), round(mean(AirbnbL$review_scores_checkin, na.rm = T)))
+
+AirbnbL$review_scores_communication <- replace(AirbnbL$review_scores_communication, is.na(AirbnbL$review_scores_communication), round(mean(AirbnbL$review_scores_communication, na.rm = T)))
+
+AirbnbL$review_scores_location <- replace(AirbnbL$review_scores_location, is.na(AirbnbL$review_scores_location), round(mean(AirbnbL$review_scores_location, na.rm = T)))
+
+AirbnbL$review_scores_value <- replace(AirbnbL$review_scores_value, is.na(AirbnbL$review_scores_value), round(mean(AirbnbL$review_scores_value, na.rm = T)))
+```
+
+```{r, echo=FALSE}
+notes_sum <- sum(is.na(AirbnbL$notes))
+cat("Number of NAs in notes:", notes_sum ,"\n")
+
+host_about_sum <- sum(is.na(AirbnbL$host_about))
+cat("Number of NAs in host_about:", host_about_sum ,"\n")
+
+bathrooms_sum <- sum(is.na(AirbnbL$bathrooms))
+cat("Number of NAs in bathrooms:", bathrooms_sum ,"\n")
+
+bedrooms_sum <- sum(is.na(AirbnbL$bedrooms))
+cat("Number of NAs in bedrooms:", bedrooms_sum ,"\n")
+
+beds_sum <- sum(is.na(AirbnbL$beds))
+cat("Number of NAs in beds:", beds_sum ,"\n")
+
+review_scores_rating_sum <- sum(is.na(AirbnbL$review_scores_rating))
+cat("Number of NAs in review_scores_rating:", review_scores_rating_sum ,"\n")
+
+review_scores_accuracy_sum <- sum(is.na(AirbnbL$review_scores_accuracy))
+cat("Number of NAs in review_scores_accuracy:", review_scores_accuracy_sum ,"\n")
+
+review_scores_cleanliness_sum <- sum(is.na(AirbnbL$review_scores_cleanliness))
+cat("Number of NAs in review_scores_cleanliness:", review_scores_cleanliness_sum ,"\n")
+
+review_scores_checkin_sum <- sum(is.na(AirbnbL$review_scores_checkin))
+cat("Number of NAs in review_scores_checkin:", review_scores_checkin_sum ,"\n")
+
+review_scores_communication_sum <- sum(is.na(AirbnbL$review_scores_communication))
+cat("Number of NAs in review_scores_communication:", review_scores_communication_sum ,"\n")
+
+review_scores_location_sum <- sum(is.na(AirbnbL$review_scores_location))
+cat("Number of NAs in review_scores_location:", review_scores_location_sum ,"\n")
+
+review_scores_value_sum <- sum(is.na(AirbnbL$review_scores_value))
+cat("Number of NAs in review_scores_value:", review_scores_value_sum ,"\n")
+```
+
+```{r, echo=FALSE}
+cat("Ending missingness in the whole dataframe:", sum(is.na(AirbnbL)),  "\n")
+```
+
+
+-- Duplicates 
+
+Using the duplicated() function an inspection on duplicates is performed. The dataframe does not seem to present duplicated rows; it is possible to check for duplicates in the "id" column as well to be sure that any accommodation was reported twice with different information for each observation. There are no duplicates in the IDs neither.
+
+```{r, echo=FALSE}
+# Check for duplicates
+duplicate_count <- sum(duplicated(AirbnbL))
+
+# Display the count of duplicates
+cat("Number of duplicates in the dataframe:", duplicate_count, "\n")
+```
+
+```{r, echo=FALSE}
+# Check for duplicate values in the "id" column
+duplicated_ids <- sum(duplicated(AirbnbL$id))
+
+# Display the count of duplicates in the id column
+cat("Number of duplicated IDs:", duplicated_ids, "\n")
+```
+
+
+#### Analysis of data according to datatype
+
+We can describe the numerical columns using the summary() function to see minimum value, 1st quantile, median, mean, 3rd quantile, maximum value, and in case the number of missing values. This analysis won't be performed on IDs, latitude and longitude since their analysis won't provide useful information. 
+From this tables, insights on the distribution of the variables can be obtained. For example, in most numeric variables minimum value, 1st quantile, median, and 3rd quantile present similar values while mean and maximum values are higher (in same cases way more higher), this means that the distribution is skewed and that there are few higher values that have a strong influence on the distribution of the variable.
+
+There are many variables where the maximum value is really high with respect to mean and other indicators, this could be due to the presence of outliers or to a very heterogeneous dataset. This is the case for host_listings_count (1024), host_total_listings_count (1024), minimum_nights (1000), number_of_reviews (392), calculated_host_listings_count (155), reviews_per_month (14), price_num (2004), weekly_price_num (14028), monthly_price_num (56220), security_deposit_num (4708), cleaning_fee_num (751), extra_people_num (351). 
+For the number of listings and minimum nights, the maximum value is an outlier, given that it's highly unlikely that one host has 1024 listings (also because the maximum computed count is 155 which is more likely) or that to book an accommodation guests should stay at least 1000 nights, which is almost 3 years. 
+For the number of reviews, the maximum value can be explained by the fact that there are listings that joined Airbnb many years ago and that could have already welcomed many guests. For reviews per month, it could be that there are some accommodations that prefer short stays (maximum 2 nights).
+For the variables related to price, it could be that there are some very expensive accommodations, since Paris is a city well-known for luxury, and there could be guests that opt for an airbnb apartment instead that a five-star hotel.
+
+```{r, echo=FALSE}
+numerical_vars <- AirbnbL %>%  select_if(is.numeric)
+useful_numerical_vars = numerical_vars[,-c(1, 2, 3, 6, 7)] # removing IDs, latitude and longitude
+summary(useful_numerical_vars)
+```
+
+For categorical variables we can use the str() function to see how many values/levels are there for each factor. For variables with few levels we can use the table() function to see the frequency of each value of the variable.
+
+```{r, echo=FALSE}
+categorical_vars <- AirbnbL %>% select_if(is.character)
+
+# Apply structure function
+str(categorical_vars)
+
+```
+
+
+-- host_is_superhost column
+
+The number of superhosts is significantly smaller than the number of "normal" hosts. Probably the super_host feature is not well-known from many hosts or it could be very hard to be classified as super_host.
+
+```{r, echo=FALSE}
+cat("Frequency table of host_is_superhost:",  "\n")
+table(AirbnbL$host_is_superhost)
+barplot(table(AirbnbL$host_is_superhost), ylab = 'Observations', col = c("coral", "pink"), xlab = "Levels")
+```
+
+-- host_response_time column
+
+From the bar plot it is possible to notice that most of the hosts respond quickly (within an hour or a few). The orange bar shows N/A values which are values that have not been assigned, probably the response time couldn't be computed or it was a very large value, i.e., not a rapid answer.
+A quick response from the host is very important, the client must be sure that in case of problems or other necessities, his host will be available and will get in touch rapidly.
+
+```{r, echo=FALSE}
+cat("Frequency table of host_response_time:",  "\n")
+table(AirbnbL$host_response_time)
+par(mfrow=c(1, 1), mar=c(10, 5, 4, 12))
+barplot(table(AirbnbL$host_response_time), 
+        ylab = 'Observations', 
+        col = c("yellow", "orange", "red", "pink", "thistle", "lightblue"), 
+        legend.text = T,
+        args.legend = list(x = "right", inset = c(-0.5, 0)), las = 2 )
+```
+
+-- host_has_profile_pic column
+
+From the frequency table and from the barplot, it can be seen that almost every host has a profile picture, which is good from the point of view of clients, since they can see the people that are offering them a place to sleep. There are just 73 hosts without a profile picture.
+
+```{r, echo=FALSE}
+cat("Frequency table of host_has_profile_pic:",  "\n")
+table(AirbnbL$host_has_profile_pic)
+barplot(table(AirbnbL$host_has_profile_pic), ylab = 'Observations', col = c("burlywood3", "lavender"))
+```
+
+-- neighbourhood_cleansed column
+
+There are 20 major neighborhoods, with some exceptions all neighborhoods have similar number of observations. The areas with more observations could be residential areas or areas that are not too pricy. Whereas the neighborhood with less observations could be areas which are very expensive.
+
+```{r, echo=FALSE }
+cat("Frequency table of neighbourhood_cleansed:",  "\n")
+table(AirbnbL$neighbourhood_cleansed)
+par(mar = c(10, 5, 4, 6))
+barplot(table(AirbnbL$neighbourhood_cleansed), ylab = 'Observations',  col = c("lightgoldenrod1", "tan2","coral", "red3","pink", "violet", "thistle", "lavender", "lightblue","cadetblue", "paleturquoise3", "aquamarine","greenyellow", "yellowgreen","chartreuse3", "darkgreen", "brown", "darkgoldenrod","burlywood3","beige"),las = 2)
+
+```
+
+-- room_type column
+
+The great majority of room_type are private accommodations, which means that the client will have the whole apartment/house for him. Still, there are some private rooms (4665) where the client stays in a shared apartment but in a private room, and there are also some shared rooms available (382).
+
+```{r, echo=FALSE}
+cat("Frequency table of room_type:",  "\n")
+table(AirbnbL$room_type)
+barplot(table(AirbnbL$room_type), ylab = 'Observations', col = c("lavender","darkseagreen3", "firebrick1"))
+```
+
+-- cancellation_policy column
+
+There are 4 different cancellation policies: flexible, moderate, strict, superstrict 30. The most frequent cancellation policy is the strict one, but there is not a big difference with flexible policy and moderate policy. The observations are almost equally distributed in this 3 policies, whereas there are just 3 accommodations with a superstrict policy.
+
+```{r, echo=FALSE}
+cat("Frequency table of cancellation_policy:",  "\n")
+table(AirbnbL$cancellation_policy)
+par(mar = c(8, 5, 4, 6))
+barplot(table(AirbnbL$cancellation_policy), ylab = 'Observations', col= c("slategray1", "slategray2", "slategray3","slategray"),las = 2)
+```
+
+
+
+- Price related Data
+
+Price is one of the most important features of the data because it is decisive when dealing with bookings. 
+There are 7 indicators for the price: price, weekly_price, monthly_price, security_deposit, cleaning_fee, guests_included, and extra_people.
+Initially, in the dataframe the variables related to price were of type character because they presented a dollar sign at the front, it was possible to transform them into numerical in the "Assigning the right datatypes" section.
+
+-- Price column
+
+```{r, , echo=FALSE}
+# Compute average of price
+avg_price <- mean(AirbnbL$price_num)
+cat("Average price of listings:", avg_price, "\n")
+
+# Compute mode of price
+mode_price <- getmode(AirbnbL$price_num)
+cat("Most frequent price:", mode_price, "\n")
+
+# Compute the median of price
+median_price <- median(AirbnbL$price_num)
+cat("Median:", median_price, "\n")
+```
+
+From the output we can see that the average price of listing is 93, while mode and median are respectively 60 and 75. Both mode and median are significantly smaller than the mean, which means that the distribution is highly skewed and that most of the observations have a price smaller than 75. At the same time this output highlights that there are few accommodations that are very expensive.
+This observation can be confirmed plotting the distribution of the price, with an histogram and a boxplot.
+The same holds for derived column like weekly price and monthly price. Usually to book a whole week of accommodation or a whole month, there are some discounts, but overall the distribution remains unchanged.
+
+```{r, echo=FALSE}
+par(mfrow = c(1, 2))
+# Histogram of listing prices
+hist(AirbnbL$price_num, breaks = 25, col = "thistle3", main = "Histogram of Listing Prices", xlab = "Price", xlim = c(0,1000))
+boxplot(AirbnbL$price_num, main = "Boxplot of Listing Prices", ylab = "Price", ylim = c(0,1000), col = "lightgoldenrod1")
+```
+
+-- Weekly_price column
+
+```{r, echo=FALSE}
+# Compute average of weekly_price
+avg_weekly_price <- mean(AirbnbL$weekly_price_num)
+cat("Average weekly_price of listings:", avg_weekly_price, "\n")
+
+# Compute the median of weekly_price
+median_weekly_price <- median(AirbnbL$weekly_price_num)
+cat("Median:", median_weekly_price, "\n")
+```
+```{r, echo=FALSE}
+par(mfrow = c(1, 2))
+# Histogram of weekly listing prices
+hist(AirbnbL$weekly_price_num, breaks = 25, col = "hotpink3", main = "Histogram of Weekly Prices", xlab = "Price")
+boxplot(AirbnbL$weekly_price_num, main = "Boxplot of Weekly Prices", ylab = "Price", ylim = c(0,8000), col = "olivedrab2")
+```
+
+
+
+-- Monthly_price column
+```{r, echo=FALSE}
+# Compute average of monthly_price
+avg_monthly_price <- mean(AirbnbL$monthly_price_num, na.rm = TRUE)
+cat("Average monthly_price of listings:", avg_monthly_price, "\n")
+
+# Compute the median of monthly_price
+median_monthly_price <- median(AirbnbL$monthly_price_num, na.rm = TRUE)
+cat("Median:", median_monthly_price, "\n")
+```
+
+
+```{r, echo=FALSE}
+par(mfrow = c(1, 2))
+# Histogram of monthly prices
+hist(AirbnbL$monthly_price_num, breaks = 25, col = "mistyrose2", main = "Histogram of Monthly Prices", xlab = "Price", xlim = c(0,30000))
+boxplot(AirbnbL$monthly_price_num, main = "Boxplot of Monthly Prices", ylab = "Price", col = "lightseagreen")
+```
+
+-- Security_deposit column
+
+For what concerns the Security Deposit, the distribution happens to be skewed but there are many more high values with respect to the price per night. Indeed, from the boxplot, it is possible to see that the box is higher which means that the observations are slightly more heterogeneous. Moreover there are many outliers with very high values (up to 4700). The values of the security deposit range from 15 to 4708, which are values that differ a lot from each other. 
+
+```{r, echo=FALSE}
+
+# Compute average of security_deposit
+avg_security_deposit <- mean(AirbnbL$security_deposit_num)
+cat("Average security_deposit:", avg_price, "\n")
+
+# Compute the median of security_deposit
+median_security_deposit <- median(AirbnbL$security_deposit_num)
+cat("Median:", median_security_deposit, "\n")
+
+# Compute max and min value
+cat("The minimum price for security deposit is  ", min(AirbnbL$security_deposit_num), "\n",
+    "The maximum price for security deposit is ", max(AirbnbL$security_deposit_num), "\n") 
+```
+
+
+```{r, echo=FALSE}
+par(mfrow = c(1, 2))
+# Histogram of Security Deposit
+hist(AirbnbL$security_deposit_num, breaks = 25, col = "lavender", main = "Histogram of Security Deposit", xlab = "Price")
+boxplot(AirbnbL$security_deposit_num, main = "Boxplot of Security Deposit", ylab = "Price",  col = "paleturquoise3")
+```
+
+-- Cleaning_fee column
+
+The average price for the cleaning fee is 29, the minimum price is 0 and the maximum 751. However most of the observations range between 0 and less than 50.
+
+```{r, echo=FALSE}
+# Compute average of cleaning_fee
+avg_cleaning_fee <- mean(AirbnbL$cleaning_fee_num)
+cat("Average cleaning_fee of listings:", avg_cleaning_fee, "\n")
+
+# Compute the median of cleaning_fee
+median_cleaning_fee <- median(AirbnbL$cleaning_fee_num)
+cat("Median:", median_cleaning_fee, "\n")
+
+# Compute max and min value
+cat("The minimum price for cleaning fee is  ", min(AirbnbL$cleaning_fee_num), "\n",
+    "The maximum price for cleaning fee is ", max(AirbnbL$cleaning_fee_num), "\n")
+```
+
+```{r, echo=FALSE}
+par(mfrow = c(1, 2))
+# Histogram of cleaning fee
+hist(AirbnbL$cleaning_fee_num, breaks = 100, col = "tan2", main = "Histogram of Cleaning Fee", xlab = "Price", xlim = c(0,200))
+
+# Boxplot of cleaning fee
+boxplot(AirbnbL$cleaning_fee_num, main = "Boxplot of Cleaning Fee", ylab = "Price",  col = "greenyellow")
+```
+
+-- Extra_people column
+
+Extra_people column contains the price to pay to add other people in the reservation. The average price is 6 but most observations have no additional fees for extra people. Whereas the maximum fee for adding extra people is 351$.
+```{r, echo=FALSE}
+# Compute average of extra_people
+avg_extra_people <- mean(AirbnbL$extra_people_num)
+cat("Average cost for extra_people:", avg_extra_people, "\n")
+
+# Compute the median of extra_people
+median_extra_people <- median(AirbnbL$extra_people_num)
+cat("Median:", median_extra_people, "\n")
+
+# Compute max and min value
+cat("The minimum price for extra people is  ", min(AirbnbL$extra_people_num), "\n",
+    "The maximum price for extra people is ", max(AirbnbL$extra_people_num), "\n")
+```
+
+```{r, echo=FALSE}
+par(mfrow = c(1, 2))
+# Histogram of Extra People Fee
+hist(AirbnbL$extra_people_num, breaks = 200, col = "coral", main = "Histogram of Extra People Fee", xlab = "Price", xlim = c(0,100))
+
+# Boxplot of Extra People Fee
+boxplot(AirbnbL$extra_people_num, main = "Boxplot of Extra People Fee", ylab = "Price",  col = "cadetblue")
+```
+
+-- Guests_included column
+
+The guest_included column is not strictly related to pricing, but it is related to the extra_people variable. Indeed, it represents the number of guests that are included in the accommodation. The minimum value of included guests is 0, while most of the observations have at least 1 guest included. The majority of values ranges between 1 and 3 but there are some exceptions, indeed the maximum value of included guests is 16.
+
+```{r, echo=FALSE}
+# Compute average of guests_included
+avg_guests_included <- mean(AirbnbL$guests_included)
+cat("Average number of guests included:", avg_guests_included, "\n")
+
+
+# Compute the median of guests_included
+median_guests_included <- median(AirbnbL$extra_people_int)
+cat("Median:", median_guests_included, "\n")
+
+# Compute max and min value
+cat("The minimum number of guests included  is ", min(AirbnbL$guests_included), "\n",
+    "The maximum number of guests included is ", max(AirbnbL$guests_included), "\n")
+```
+
+```{r, echo=FALSE}
+par(mfrow = c(1, 2))
+# Histogram of Guests Included
+hist(AirbnbL$guests_included, breaks = 50, col = "mediumseagreen", main = "Histogram of Guests Included", xlab = "Number of guests")
+
+# Boxplot of Guests Included
+boxplot(AirbnbL$guests_included, main = "Boxplot of Guests Included", ylab = "Number of guests",  col = "lightcyan")
+```
+
+- Location related Data
+
+The variables regarding the location of the accommodations are: neighborhood, neighborhood_overview, street, neighborhood_cleansed, neighborhood_group_cleansed, city, state, zipcode, country, latitude, longitude, is_location_exact, smart_location.
+The most common way to distinguish neighborhoods in Paris is the number of arrondissement. In order to extract it we can start from the neighborhood columns. Of course it must be cleaned since the division in neighborhoods was made both using arrondissement nomenclature and the name of the area of the accommodation. Due to this inconsistency in the data, it is better to extract the arrondissement from the zipcode (last 2 digits). However not all accommodations are in the city center, some are in the neighborhoods in the nearbies. To deal with these we could extract the first 2 digits instead of the last two in order to identify them, but this is just an approximation. 
+During the creation of arrondissement 255 NAs appeared which will be filled with the arrondissements observed more frequenty (choosing between those from 1 to 20).
+
+```{r, echo=FALSE}
+# Compute the number of listings in each neighborhood
+neighborhood_counts <- table(AirbnbL$neighbourhood)
+cat("Number of listings in each neighborhood:\n")
+print(neighborhood_counts)
+```
+
+```{r, echo=FALSE, warning=FALSE}
+# Create a new column "arrondissement" and extract the arrondissement from the zipcode
+AirbnbL$arrondissement <- ifelse(
+  substr(AirbnbL$zipcode, 1, 2) == "75",
+  as.integer(substr(AirbnbL$zipcode, 4, 5)),
+  as.integer(substr(AirbnbL$zipcode, 1, 2))
+)
+cat("Number of missing values created: ", sum(is.na(AirbnbL$arrondissement)),"\n")
+```
+
+
+
+```{r, echo=FALSE}
+arrondissement_counts <- table(AirbnbL$arrondissement)
+cat("Number of listings in each neighborhood:\n")
+print(arrondissement_counts)
+```
+
+```{r, echo=FALSE}
+# arrondissement with highest number of observation
+mode_arrondissement <- order(table(AirbnbL$arrondissement), decreasing = T)[1]
+
+AirbnbL$arrondissement <- replace(AirbnbL$arrondissement, is.na(AirbnbL$arrondissement), mode_arrondissement)
+
+cat("Number of missing values left: ", sum(is.na(AirbnbL$arrondissement)),"\n")
+```
+
+It is possible to visualize the distribution of the observations according to the arrondissement using an histogram and a boxplot. In the histogram the xlim is set to 20 so that it is possible to give a closer look to "real" arrondissements (from 1st to 20th), whereas in the boxplot all values of arrondissements are shown. 
+Indeed, from the boxplot we can see that all the values exceeding 20 are considered as outliers.
+On average there are more listing in the arrondissement from the 10th to the 20th, with respect to those from the 1st to the 9th which are located in the city center. This could be explained by the fact that in the city center is very expensive and probably it's not so convenient for an host to open an Airbnb in the center of the city. Whereas in the arrondissement from 10 to 20 the location is still very well connected to the center but at the same time the area is a little bit more residential and less touristic, of course with some exceptions. 
+
+```{r, echo=FALSE}
+par(mfrow = c(1, 2))
+# Histogram of Arrondissement
+hist(AirbnbL$arrondissement, breaks = 100, col = "mistyrose3", main = "Histogram of Arrondissement", xlab = "Arrondissement", xlim = c(1,20))
+
+# Boxplot of Arrondissement
+boxplot(AirbnbL$arrondissement, main = "Boxplot of Arrondissement", ylab = "Arrondissement",  col = "olivedrab1")
+```
+
+With the Arrondissement variable we can also compute the average price per Arrondissement and plot it.
+```{r, echo=FALSE}
+# Compute average price per arrondissement
+avg_price_arrondissement <- aggregate(price_num ~ arrondissement, data = AirbnbL, FUN = mean)
+
+```
+
+```{r, echo=FALSE}
+# View the average price per arrondissement
+
+cat("Average price per arrondissement:\n")
+avg_price_arrondissement
+
+```
+
+The following plot shows just arrondissements from 1st to 20th. The price is on the y axis and the bars are coloured according to increasing price, which means that darker bars are arrondissements where the price is on average higher. It can be clearly seen that arrondissements from 1st to 8th are generally more expensive, whereas from 9th to 20th the average price does not exceed 100 with the exception of the 16th arrondissement.
+
+```{r, echo=FALSE}
+ggplot(avg_price_arrondissement, aes(x = arrondissement, y = price_num, fill = price_num)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Average Price per Arrondissement", x = "Arrondissement", y = "Price") +
+  scale_fill_gradient(low = "lightblue", high = "darkblue") +
+  theme(axis.text.x = element_text(angle = 0, hjust = 0)) +
+  coord_cartesian(xlim = c(0, 20), ylim = c(0,200))
+
+```
+
+We can also plot the price using a barplot, arranging the bars in decreasing order of price. In this case there are also arrondissements higher than the 20th, however these are probably outliers or wrong data hence shouldn't be trustworthy.
+
+```{r, echo=FALSE}
+
+# Order the dataframe by average price in decreasing order
+avg_price_arrondissement <- avg_price_arrondissement[order(-avg_price_arrondissement$price_num), ]
+
+# Adjust the graphical parameters to reduce the x-axis values size
+par( cex.axis = 0.5)
+
+# Create a bar plot of average prices per arrondissement with reduced x-axis values size
+barplot(avg_price_arrondissement$price_num, main = "Average Price per Arrondissement", xlab = "Arrondissement", ylab = "Price",
+        names.arg = avg_price_arrondissement$arrondissement, col = heat.colors(length(avg_price_arrondissement$price_num)))
+
+```
+
+Another interesting visualization related to the location is the plot of the map of Paris with the most relevant monuments. On the Paris map we can overlap the position of the accommodations using their coordinates. 
+From the output we can see that the two are not overlapping perfectly (the black area that represents Paris should be transposed a little bit to the left), still it is possible to see that there are many accommodations outside the centre of Paris, in Boulogne Billancourt. Another interesting thing to notice is that the river Seine is easily recognizable, and the same for the biggest parks of the city. This is because inside the parks and in the river there cannot be accomodations. 
+
+```{r,echo=FALSE}
+# Define the names of famous monuments
+monument_names <- c("Eiffel Tower", "Louvre Museum", "Luxembourg Gardens", "Tuileries Gardens", "Champs-Elysees", "Parc des Buttes Chaumont", "Gare de l'Est", "Gare du Nord", "Gare de Lyon", "Musee d'Orsay", "Notre-Dame Cathedral", "Montmartre", "Pere Lachaise Cemetery")
+
+# Define the corresponding latitude and longitude coordinates
+monument_lat <- c(48.8584, 48.8606, 48.8462, 48.8635, 48.8721, 48.8788, 48.8760, 48.8809, 48.8448, 48.8599, 48.8530, 48.8867, 48.8614)
+monument_lon <- c(2.2945, 2.3376, 2.3372, 2.3278, 2.3018, 2.3845, 2.3582, 2.3499, 2.3731, 2.3264, 2.3499, 2.3431, 2.3931)
+
+# Create a dataframe for the monument locations
+monument_data <- data.frame(name = monument_names, longitude = monument_lon, latitude = monument_lat)
+
+# Filter the AirbnbL dataframe for listings in Paris
+paris_listings <- subset(AirbnbL, city == "Paris")
+
+paris_region <- map_data('france',region="Paris")
+l_point<-data.frame(long=c(2,2.5,3.0),lat=c(48.6,48.35,48.9),valeur=c(1,3,5))
+
+# Create the map
+map <- ggplot() +
+  geom_polygon(data = paris_region, aes(x = long, y = lat, group = group), color = "black", linetype = "dashed") +
+  geom_point(data = paris_listings, aes(x = longitude, y = latitude), color = "pink", size = 0.03) +
+  geom_point(data = monument_data, aes(x = longitude, y = latitude, label = name), color = "red", size = 1) +
+    xlim(2.23, 2.49) +
+  ylim(48.8, 48.91) +
+  coord_fixed()
+
+# Print the map
+print(map)
+```
+
+Moreover using the leaflet() function we can show the metropolitan map of Paris to easily identify the biggest gardens of the city as well as the principal neighborhoods. Then we can overlap the accommodations to this map and see that they cover almost the entire available surface of Paris. Zooming in we can see the exact position of the accommodations and which are the monuments and parks in the nearbies.
+
+```{r,echo=FALSE}
+mygeocode <- function(adresses){
+  nominatim_osm <- function(address = NULL){
+    if(suppressWarnings(is.null(address)))  return(data.frame())
+    tryCatch(
+      d <- jsonlite::fromJSON(
+        gsub('\\@addr\\@', gsub('\\s+', '\\%20', address),
+             'http://nominatim.openstreetmap.org/search/@addr@?format=json&addressdetails=0&limit=1')
+      ), error = function(c) return(data.frame())
+    )
+    if(length(d) == 0) return(data.frame())
+    return(c(as.numeric(d$lon), as.numeric(d$lat)))
+  }
+  tableau <- t(sapply(adresses,nominatim_osm))
+  colnames(tableau) <- c("lon","lat")
+  return(tableau)
+}
+Paris <- mygeocode("paris")
+m2 <- leaflet() |> setView(lng = Paris[1], lat = Paris[2], zoom = 12) |> 
+  addTiles()
+m2 |> addProviderTiles("Wikimedia")
+```
+
+```{r,echo=FALSE}
+# Obtain the coordinates of Paris
+Paris <- mygeocode("Paris")
+
+# Create a leaflet map of Paris
+m2 <- leaflet() %>%
+  setView(lng = Paris[1], lat = Paris[2], zoom = 12) %>%
+  addTiles() %>%
+  addProviderTiles("Wikimedia")
+
+# Add the accommodations as dots
+m2 <- m2 %>%
+  addCircleMarkers(
+    data = paris_listings,
+    lng = ~longitude,
+    lat = ~latitude,
+    color = "white",
+    radius = 1,
+    fillOpacity = 0.001, 
+  )
+
+# Print the map
+m2
+
+```
+
+
+
+### Analyzing AirbnbR
+
+AirbnbR dataframe has 663599 observations with 2 columns: listing_id and date. These two columns represent the accommodation and the date of the booking of the accommodation. Hence, in this dataset it is normal to have duplicated IDs, but there shouldn't be duplicated rows since an accommodation can't be booked twice the same day. 
+There are no missing values in AirbnbR, but there are 3069 duplicates that must be dropped.
+The datatype of the two columns are integer (for the ID) and character (for the date). In order to analyze the temporal structure of the data, "date" column must be converted into a date format.
+
+```{r, echo=FALSE}
+cat("Dimension of AirbnbR:",dim(AirbnbR))
+```
+
+```{r, echo=FALSE}
+cat("Column names of AirbnbR:",colnames(AirbnbR))
+```
+
+```{r, echo=FALSE}
+cat("Missingness in AirbnbR:",sum(is.na(AirbnbR)))
+```
+
+```{r, echo=FALSE}
+cat("Starting duplicated values in AirbnbR:",sum(duplicated(AirbnbR)), "\n")
+AirbnbR <- AirbnbR[!duplicated(AirbnbR), ]
+cat("Ending duplicated values in AirbnbR:",sum(duplicated(AirbnbR)))
+```
+
+```{r, echo=FALSE}
+cat("Datatype of columns of AirbnbR:", "\n", "\n")
+lapply(AirbnbR,class)
+```
+
+- Time related data 
+
+With the as.Date function we can convert date column into a date format. Then we can check whether the transformation caused any missing values. Now that we have a date format we can extract year and month to create the month_year column. 
+This column is useful because reduces the number of different values in the column.
+
+```{r,echo=FALSE}
+# Explore time-related information
+
+# Convert the "date" column to Date format
+AirbnbR$date <- as.Date(AirbnbR$date)
+cat("Datatype of Date:", class(AirbnbR$date), "\n")
+cat("Number of missing values due to change of datatype:", sum(is.na(AirbnbR$date)), "\n")
+
+```
+
+```{r,echo=FALSE}
+# Extract the year and month from the "date" column and create "year_month" column
+AirbnbR$year_month <- as.yearmon(AirbnbR$date)
+```
+
+The first recorded date for the accommodation booking is May 2009 and latest is July 2016. An important thing to notice is that the number of observations increases as the date gets more recent, this could be due to the fact that as time went by many more hosts joined Airbnb with their accommodation. And at the same time tourists and other visitors started to choose an Airbnb's accommodation instead of a regular hotel. 
+To have a more clear view we can transform the frequency table into a dataframe and arrange it in decreasing order of frequency in order to see which are the month-year with more listings bookings.
+
+```{r,echo=FALSE}
+# Count the number of listings for each date
+date_counts <- table(AirbnbR$year_month)
+cat("Number of listings for each date:\n")
+print(date_counts)
+
+date_counts_df <- data.frame(date_counts)
+cat("Month-year of booking ordered according to number of listings:\n")
+date_counts_df %>% arrange(desc(Freq))
+```
+
+The airbnb's listings can also be visualised using the ggplot() function to see the temporal pattern linked to the listings. Indeed, the highest values are in the more recent dates and it is possible to see an increasing pattern with an exponential shape as time goes by.
+
+```{r,echo=FALSE }
+
+# Plot the count data using ggplot2
+ggplot(date_counts_df, aes(x = Var1, y = Freq)) +
+  geom_line(color = "darkseagreen") +
+  geom_point(color = "darkseagreen", size = 1.5) +
+  labs(x = "Date", y = "Count", title = "Airbnb Listings Count Over Time") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, size = 5))
+```
+
+Another way to visualize how the observations are distributed according to the year is a stacked bar. Each rectangle represent a different year and each one is colored in a different way to easily recognize them. 
+The higher the rectangle, the higher number of observations for that year. 
+The years 2009 and 2010 are just very thin lines since they have just a few observation, while the highest rectangle is year 2015. This is because 2016 was observed until July, i.e., almost just half of the year was recorded. This would probably mean that 2016 would be the year with the highest number of listings since 5 months of 2016 were not considered.
+
+```{r,echo=FALSE}
+year <- format(AirbnbR$year_month, "%Y")
+year_df <- data.frame(year)
+
+
+ggplot(data = year_df) + 
+  geom_bar(aes(x='',fill=factor(year)), show.legend = T) 
+
+```
+
+
+#### Merging AirbnbR and AirbnbL
+
+Merging the dataframes can be useful to combine the information from both datasets based on the common "listing_id" column. By merging the dataframes, there will be a single dataframe "AirbnbMerge" that includes both the listing information from AirbnbL and the corresponding dates from AirbnbR. This provides a more comprehensive dataset that could allow more analysis or modelling.
+
+
+```{r, echo=FALSE}
+AirbnbMerge <- left_join(AirbnbL, AirbnbR, by = c("id" = "listing_id"))
+```
+
+```{r, echo=FALSE}
+cat("The dimension of the merged dataframe is: ",dim(AirbnbMerge), "\n")
+```
+
+```{r, echo=FALSE}
+cat("Columns of the merged dataframe is: \n \n ", colnames(AirbnbMerge), "\n")
+```
+
+```{r,echo=FALSE}
+# Convert the date column to date format in the AirbnbR dataset
+AirbnbMerge$date <- as.Date(AirbnbMerge$date)
+```
+
+
+Lastly we should whether the merging created some missing data. In this case there is no missingness and the merged dataset is cleaned and complete.
+
+```{r, echo=FALSE}
+cat("Number of missing values in the merged dataframe: ", sum(is.na(AirbnbMerge)), "\n")
+```
+
+```{r, include=FALSE}
+write.csv(AirbnbL,file='airbnb_L.csv') # save L dataframe as csv
+write.csv(AirbnbR,file='airbnb_R.csv') # save R dataframe as csv
+write.csv(AirbnbMerge,file='AirbnbMerge.csv') # save AirbnbMerge dataframe as csv
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
