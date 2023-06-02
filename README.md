@@ -237,11 +237,9 @@ Analyzing AirbnbL
  
  Analysis of data according to datatype
  
-   Categorical data
- 
-   Price related data
- 
-   Location related data
+  Categorical data
+  Price related data
+  Location related data
 
 Analyzing AirbnbR
 
