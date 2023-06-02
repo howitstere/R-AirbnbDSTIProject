@@ -233,7 +233,7 @@ Analyzing AirbnbL
   
     Missingness
  
-   Duplicates
+    Duplicates
  
  Analysis of data according to datatype
  
